@@ -102,11 +102,12 @@ def process_student_data(score1, score2, score3, school_name, student_id=None):
     # 3. Tạo vector đặc trưng (Feature Vector)
     # Thứ tự features phải KHỚP CHÍNH XÁC với lúc huấn luyện:
     # [score1, score2, score3, final_score, school_encoded]
-    features = np.array([[score1, score2, score3, final_score, school_encoded]])
+    features_df = pd.DataFrame([[score1, score2, score3, final_score, school_encoded]], 
+                               columns=['score1', 'score2', 'score3', 'final_score', 'school_encoded'])
     
     # 4. Chuẩn hóa dữ liệu (Scaling)
     # Đưa dữ liệu về cùng phân phối với tập huấn luyện
-    features_scaled = model_artifacts['scaler'].transform(features)
+    features_scaled = model_artifacts['scaler'].transform(features_df)
     
     # 5. Dự đoán phân cụm (Clustering Prediction)
     cluster = model_artifacts['kmeans'].predict(features_scaled)[0]
