@@ -62,11 +62,16 @@ def load_artifacts():
 # ĐỊNH NGHĨA DỮ LIỆU (DATA MODELS)
 # ==========================================
 
+from typing import List, Optional
+
+# ... (imports)
+
 class StudentInput(BaseModel):
     """
     Mô hình dữ liệu đầu vào cho một học viên.
     Sử dụng Pydantic để validate dữ liệu tự động.
     """
+    student_id: Optional[str] = None # ID định danh học viên (tùy chọn, để client dễ đối chiếu)
     score1: float       # Điểm môn 1
     score2: float       # Điểm môn 2
     score3: float       # Điểm môn 3
@@ -76,16 +81,9 @@ class StudentInput(BaseModel):
 # HÀM HỖ TRỢ (HELPER FUNCTIONS)
 # ==========================================
 
-def process_student_data(score1, score2, score3, school_name):
+def process_student_data(score1, score2, score3, school_name, student_id=None):
     """
     Hàm xử lý logic dự đoán cốt lõi cho một học viên.
-    
-    Quy trình:
-    1. Tính điểm trung bình (Final Score).
-    2. Mã hóa tên trường học sang dạng số.
-    3. Chuẩn hóa dữ liệu đầu vào.
-    4. Dự đoán cụm (Cluster) bằng K-Means.
-    5. Ánh xạ cụm sang nhãn xếp loại (Rank).
     """
     # 1. Tính điểm trung bình
     final_score = np.mean([score1, score2, score3])
@@ -116,7 +114,7 @@ def process_student_data(score1, score2, score3, school_name):
     # 6. Gán nhãn xếp loại (Label Mapping)
     rank = model_artifacts['mapping'].get(cluster, "Không xác định")
     
-    return {
+    result = {
         "score1": score1,
         "score2": score2,
         "score3": score3,
@@ -125,6 +123,12 @@ def process_student_data(score1, score2, score3, school_name):
         "cluster": int(cluster), # Chuyển về int python thuần để trả về JSON
         "rank": rank
     }
+    
+    # Nếu có ID thì trả về kèm để client đối chiếu
+    if student_id is not None:
+        result["student_id"] = student_id
+        
+    return result
 
 # ==========================================
 # CÁC ENDPOINT API (API ENDPOINTS)
@@ -154,7 +158,7 @@ def predict_student(student: StudentInput):
     if not model_artifacts:
         raise HTTPException(status_code=500, detail="Mô hình chưa được tải (Model not loaded).")
     try:
-        result = process_student_data(student.score1, student.score2, student.score3, student.school_name)
+        result = process_student_data(student.score1, student.score2, student.score3, student.school_name, student.student_id)
         return result
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Lỗi xử lý: {str(e)}")
@@ -173,7 +177,7 @@ def predict_batch(students: List[StudentInput]):
     results = []
     for student in students:
         try:
-            res = process_student_data(student.score1, student.score2, student.score3, student.school_name)
+            res = process_student_data(student.score1, student.score2, student.score3, student.school_name, student.student_id)
             results.append(res)
         except Exception as e:
             # Nếu một dòng lỗi, trả về thông báo lỗi cho dòng đó nhưng không dừng toàn bộ process
