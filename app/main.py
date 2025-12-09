@@ -21,6 +21,19 @@ app = FastAPI(
 )
 
 # ==========================================
+# CẤU HÌNH CORS (CORS CONFIGURATION)
+# ==========================================
+from fastapi.middleware.cors import CORSMiddleware
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Cho phép tất cả các origins trong quá trình phát triển
+    allow_credentials=True,
+    allow_methods=["*"],  # Cho phép tất cả các methods (bao gồm OPTIONS)
+    allow_headers=["*"],
+)
+
+# ==========================================
 # CẤU HÌNH ĐƯỜNG DẪN (PATH CONFIGURATION)
 # ==========================================
 
