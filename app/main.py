@@ -16,8 +16,8 @@ app = FastAPI(
     title="Hệ Thống Phân Loại Học Viên (Student Classification API)",
     description="API cung cấp dịch vụ dự đoán xếp loại học viên dựa trên kết quả học tập và trường học, sử dụng thuật toán K-Means Clustering.",
     version="1.0.0",
-    docs_url="/docs",  # Đường dẫn tài liệu Swagger UI
-    redoc_url="/redoc" # Đường dẫn tài liệu ReDoc
+    docs_url="/docs", 
+    redoc_url="/redoc"
 )
 
 # ==========================================
@@ -27,9 +27,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Cho phép tất cả các origins trong quá trình phát triển
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["*"],  # Cho phép tất cả các methods (bao gồm OPTIONS)
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 
@@ -42,10 +42,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 ARTIFACTS_DIR = os.path.join(BASE_DIR, "../model/artifacts")
 
 # Đường dẫn chi tiết đến từng file thành phần
-MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'kmeans_model.pkl')       # Mô hình K-Means
-SCALER_PATH = os.path.join(ARTIFACTS_DIR, 'scaler.pkl')            # Bộ chuẩn hóa dữ liệu (StandardScaler)
-ENCODER_PATH = os.path.join(ARTIFACTS_DIR, 'encoder.pkl')          # Bộ mã hóa tên trường (OrdinalEncoder)
-MAPPING_PATH = os.path.join(ARTIFACTS_DIR, 'cluster_mapping.pkl')  # Ánh xạ từ cụm sang nhãn xếp loại
+MODEL_PATH = os.path.join(ARTIFACTS_DIR, 'kmeans_model.pkl')       
+SCALER_PATH = os.path.join(ARTIFACTS_DIR, 'scaler.pkl')            
+ENCODER_PATH = os.path.join(ARTIFACTS_DIR, 'encoder.pkl')         
+MAPPING_PATH = os.path.join(ARTIFACTS_DIR, 'cluster_mapping.pkl') 
 
 # Biến toàn cục để lưu trữ các thành phần mô hình sau khi tải
 model_artifacts = {}
@@ -66,10 +66,9 @@ def load_artifacts():
         model_artifacts['scaler'] = joblib.load(SCALER_PATH)
         model_artifacts['encoder'] = joblib.load(ENCODER_PATH)
         model_artifacts['mapping'] = joblib.load(MAPPING_PATH)
-        print("✅ Đã tải thành công mô hình và các artifacts!")
+        print("Đã tải thành công mô hình và các artifacts!")
     except Exception as e:
-        print(f"❌ LỖI NGHIÊM TRỌNG: Không thể tải artifacts. Chi tiết: {e}")
-        # Lưu ý: Trong môi trường production, có thể cân nhắc dừng server nếu không tải được model.
+        print(f"LỖI NGHIÊM TRỌNG: Không thể tải artifacts. Chi tiết: {e}")
 
 # ==========================================
 # ĐỊNH NGHĨA DỮ LIỆU (DATA MODELS)
@@ -77,18 +76,15 @@ def load_artifacts():
 
 from typing import List, Optional
 
-# ... (imports)
 
 class StudentInput(BaseModel):
     """
     Mô hình dữ liệu đầu vào cho một học viên.
     Sử dụng Pydantic để validate dữ liệu tự động.
     """
-    student_id: Optional[str] = None # ID định danh học viên (tùy chọn, để client dễ đối chiếu)
-    score1: float       # Điểm môn 1
-    score2: float       # Điểm môn 2
-    score3: float       # Điểm môn 3
-    school_name: str    # Tên trường học (VD: "Trường THPT Nguyễn Thượng Hiền")
+    student_id: Optional[str] = None
+    score3: float     
+    school_name: str
 
 # ==========================================
 # HÀM HỖ TRỢ (HELPER FUNCTIONS)
@@ -103,23 +99,15 @@ def process_student_data(score1, score2, score3, school_name, student_id=None):
     
     # 2. Xử lý mã hóa tên trường (School Encoding)
     try:
-        # Encoder trả về giá trị số tương ứng với rank của trường.
-        # Nếu trường không có trong danh sách huấn luyện (Unknown), 
-        # encoder sẽ trả về giá trị mặc định (thường là -1) hoặc gây lỗi tùy cấu hình.
         school_encoded = model_artifacts['encoder'].transform([[school_name]])[0][0]
     except (ValueError, Exception):
-        # Fallback an toàn: Nếu gặp trường lạ hoặc lỗi, gán giá trị -1.0.
-        # Giá trị -1.0 thấp hơn Rank 10 (0.0), đồng nghĩa với việc xếp trường này vào nhóm thấp nhất.
         school_encoded = -1.0
 
     # 3. Tạo vector đặc trưng (Feature Vector)
-    # Thứ tự features phải KHỚP CHÍNH XÁC với lúc huấn luyện:
-    # [score1, score2, score3, final_score, school_encoded]
     features_df = pd.DataFrame([[score1, score2, score3, final_score, school_encoded]], 
                                columns=['score1', 'score2', 'score3', 'final_score', 'school_encoded'])
     
     # 4. Chuẩn hóa dữ liệu (Scaling)
-    # Đưa dữ liệu về cùng phân phối với tập huấn luyện
     features_scaled = model_artifacts['scaler'].transform(features_df)
     
     # 5. Dự đoán phân cụm (Clustering Prediction)
@@ -134,11 +122,10 @@ def process_student_data(score1, score2, score3, school_name, student_id=None):
         "score3": score3,
         "school_name": school_name,
         "final_score": round(final_score, 2),
-        "cluster": int(cluster), # Chuyển về int python thuần để trả về JSON
+        "cluster": int(cluster),
         "rank": rank
     }
     
-    # Nếu có ID thì trả về kèm để client đối chiếu
     if student_id is not None:
         result["student_id"] = student_id
         
@@ -194,7 +181,6 @@ def predict_batch(students: List[StudentInput]):
             res = process_student_data(student.score1, student.score2, student.score3, student.school_name, student.student_id)
             results.append(res)
         except Exception as e:
-            # Nếu một dòng lỗi, trả về thông báo lỗi cho dòng đó nhưng không dừng toàn bộ process
             results.append({"error": str(e), "input": student.dict()})
     return results
 
@@ -228,7 +214,6 @@ async def predict_csv(file: UploadFile = File(...)):
         for index, row in df.iterrows():
             try:
                 res = process_student_data(row['score1'], row['score2'], row['score3'], row['school_name'])
-                # Giữ lại ID nếu có để dễ đối chiếu
                 if 'id' in row:
                     res['id'] = row['id']
                 results.append(res)
@@ -242,5 +227,4 @@ async def predict_csv(file: UploadFile = File(...)):
 
 if __name__ == "__main__":
     import uvicorn
-    # Chạy server uvicorn khi file được thực thi trực tiếp
     uvicorn.run(app, host="0.0.0.0", port=8000)
